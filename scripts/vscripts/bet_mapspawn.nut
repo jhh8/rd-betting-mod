@@ -372,12 +372,12 @@ function OnGameEvent_player_say( params )
 		
 		ClientPrint( hCaller, 3, "%s1You have: %s2%s3%s1 pts.", COLOR_RED, COLOR_WHITE_NOBLEND, strPoints );
 		ClientPrint( hCaller, 3, "%s1Do %s2/bet marines <amount>%s1 to bet for marines.", COLOR_BLUE, COLOR_WHITE_NOBLEND );
-		ClientPrint( hCaller, 3, "%s1Do %s2/bet swarm <amount>%s1 to bet for marines.", COLOR_BLUE, COLOR_WHITE_NOBLEND );
+		ClientPrint( hCaller, 3, "%s1Do %s2/bet swarm <amount>%s1 to bet for swarm.", COLOR_BLUE, COLOR_WHITE_NOBLEND );
 		ClientPrint( hCaller, 3, "%s2<amount>%s1 can be a %s2value%s1, a %s2percentage%s1 or %s2all%s1.", COLOR_BLUE, COLOR_WHITE_NOBLEND );
 		ClientPrint( hCaller, 3, "%s1You are placing bets with other players, betting alone does not do anything.", COLOR_BLUE );
 		ClientPrint( hCaller, 3, "%s1Minimal bet is 100 points.", COLOR_BLUE );
 		ClientPrint( hCaller, 3, "%s1You can not place bets if you are taking part in the round and you can only place bets in first %s2 seconds of the mission.", COLOR_RED, BET_PLACE_TIME );
-		ClientPrint( hCaller, 3, "%s1 Do %s2/top %s2<number>%s1 to see players with top number of points.", COLOR_BLUE, COLOR_WHITE_NOBLEND );
+		ClientPrint( hCaller, 3, "%s1Do %s2/top %s2<number>%s1 to see players with top number of points.", COLOR_BLUE, COLOR_WHITE_NOBLEND );
 		ClientPrint( hCaller, 3, "%s1Link to mod: %s2https://github.com/jhh8/rd-betting-mod", COLOR_BLUE, COLOR_WHITE_NOBLEND );
 		
 		return;
