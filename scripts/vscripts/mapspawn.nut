@@ -1,0 +1,1 @@
+IncludeScript( "bet_mapspawn.nut" );
