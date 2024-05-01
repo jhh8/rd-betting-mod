@@ -46,7 +46,7 @@ AlienWorth_t <-
 	npc_poisonzombie = 1
 };
 
-const PROFILE_VERSION = 1;
+const PROFILE_VERSION = 2;
 const BET_PLACE_TIME = 30.0;
 
 Bet_t <- [ {}, {} ];
@@ -79,7 +79,7 @@ function OnGameplayStart()
 }
 
 function InitHud( hMarine )
-{
+{	
 	if ( !hMarine.IsInhabited() )
 		return;
 	
@@ -96,18 +96,7 @@ function InitHud( hMarine )
 	hHud.SetName( "bethud_" + GetNetworkID( hPlayer ) );
 
 	local strFileName = "bet_profile_" + GetNetworkID( hPlayer );
-	local Profile_t = FileToProfile( strFileName );
-	if ( Profile_t.len() == 0 )
-	{
-		local strNew = PROFILE_VERSION + "|0";
-		StringToFile( strFileName, strNew );
-		
-		Profile_t = StringToProfile( strNew );
-	}
-	else if ( Profile_t[0].tointeger() != PROFILE_VERSION )
-	{
-		// future code here
-	}
+	local Profile_t = GetProfileModify( strFileName );
 
 	local nCurPts = Profile_t[1].tointeger();
 	local nCurLvl = PointsToLevel( nCurPts );
@@ -121,7 +110,7 @@ function InitHud( hMarine )
 	hHud.SetInt( 0, 200 );	// r
 	hHud.SetInt( 1, 10 );	// g
 	hHud.SetInt( 2, 10 );	// b
-	hHud.SetInt( 3, 192 );	// a
+	//hHud.SetInt( 3, 192 );	// a
 	hHud.SetInt( 4, 12 );	// font DefaultLarge
 	
 	// POINTS string
@@ -130,7 +119,7 @@ function InitHud( hMarine )
 	hHud.SetInt( 5, 150 );	// r
 	hHud.SetInt( 6, 20 );	// g
 	hHud.SetInt( 7, 30 );	// b
-	hHud.SetInt( 8, 192 );	// a
+	//hHud.SetInt( 8, 192 );	// a
 	hHud.SetInt( 9, 12 );	// font DefaultLarge
 	
 	// RANK string
@@ -140,8 +129,10 @@ function InitHud( hMarine )
 	hHud.SetInt( 10, vecRankColor.x );	// r
 	hHud.SetInt( 11, vecRankColor.y );	// g
 	hHud.SetInt( 12, vecRankColor.z );	// b
-	hHud.SetInt( 13, 192 );	// a
+	//hHud.SetInt( 13, 192 );	// a
 	hHud.SetInt( 14, 12 );	// font DefaultLarge
+	
+	HudSetVisibility( hHud, Profile_t[2] != "0" );
 	
 	// 0 - lvl, 1 - pts, 2 - pts for rankup, 3 - name, 4 - pts at start, 5 - minus pts for ff, 6 - placement in top100
 	PointsChanged_t[ GetNetworkID( hPlayer ) ] <- [ nCurLvl, nCurPts, nNxtPts, hPlayer.GetPlayerName(), nCurPts, 0, 0 ];
@@ -149,6 +140,16 @@ function InitHud( hMarine )
 	HealStat_t[ GetNetworkID( hPlayer ) ] <- 0;
 	
 	return hHud;
+}
+
+function HudSetVisibility( hHud, bVisible )
+{
+	if ( !hHud )
+		return;
+		
+	hHud.SetInt( 3, bVisible ? 192 : 0 );
+	hHud.SetInt( 8, bVisible ? 192 : 0 );
+	hHud.SetInt( 13, bVisible ? 192 : 0 );
 }
 
 function AwardPoints( hMarine, nPoints )
@@ -220,9 +221,7 @@ function WriteAwardedPoints()
 	{
 		ClientPrint( null, 3, "%s1%s2 %s3pts %s1" + Data_t[4].tostring() + "%s3 → %s1" + Data_t[1].tostring() + "%s3 (%s1%s4%s3). %s1-" + Data_t[5] + " %s3for FF. " + ( Data_t[6] ? "Rank %s1#" + Data_t[6].tostring() + "%s3." : "" ), COLOR_WHITE, Data_t[3], COLOR_GREEN, ( Data_t[1] - Data_t[4] ) >= 0 ? "+" + ( Data_t[1] - Data_t[4] ).tostring() : ( Data_t[1] - Data_t[4] ).tostring() );
 		
-		local strData = PROFILE_VERSION.tostring() + "|" + Data_t[1].tostring();
-		
-		StringToFile( "bet_profile_" + strSteamID, strData );
+		GetProfileModify( "bet_profile_" + strSteamID, Data_t[1] );
 	}
 }
 
@@ -378,6 +377,7 @@ function OnGameEvent_player_say( params )
 		ClientPrint( hCaller, 3, "%s1Minimal bet is 100 points.", COLOR_BLUE );
 		ClientPrint( hCaller, 3, "%s1You can not place bets if you are taking part in the round and you can only place bets in first %s2 seconds of the mission.", COLOR_RED, BET_PLACE_TIME );
 		ClientPrint( hCaller, 3, "%s1Do %s2/top %s2<number>%s1 to see players with top number of points.", COLOR_BLUE, COLOR_WHITE_NOBLEND );
+		ClientPrint( hCaller, 3, "%s1Do %s2/bet_hudenabled %s2<0 or 1>%s1 to toggle hud.", COLOR_BLUE, COLOR_WHITE_NOBLEND );
 		ClientPrint( hCaller, 3, "%s1Link to mod: %s2https://github.com/jhh8/rd-betting-mod", COLOR_BLUE, COLOR_WHITE_NOBLEND );
 		
 		return;
@@ -396,10 +396,35 @@ function OnGameEvent_player_say( params )
 		local Placements_t = split( FileToString( "bet_top100" ), "|" );
 		for ( local i = 0; i < Placements_t.len(); i++ )
 			Placements_t[i] = strip( Placements_t[i] );
+		
+		try 
+		{
+			for ( local i = 0; i < Placements_t.len() && i < nTop; i++ )
+				ClientPrint( hCaller, 3, "%s1" + ( i + 1 ).tostring() + ". %s2%s3%s1 - %s2%s4%s1 pts.", COLOR_GREEN, COLOR_WHITE, Placements_t[ i * 3 + 1 ], Placements_t[ i * 3 + 2 ] );
+		} catch ( exc ) {}
+		
+		return;
+	}
+	
+	if ( argc >= 2 && argv[0] == "/bet_hudenabled" )
+	{
+		local strFileName = "bet_profile_" + GetNetworkID( hCaller );
+		
+		if ( argv[1] == "0" )
+		{
+			GetProfileModify( strFileName, -1, 0 );
+			ClientPrint( hCaller, 3, "You have disabled bet hud." );
 			
-		for ( local i = 0; i < Placements_t.len() && i < nTop; i++ )
-			ClientPrint( hCaller, 3, "%s1" + ( i + 1 ).tostring() + ". %s2%s3%s1 - %s2%s4%s1 pts.", COLOR_GREEN, COLOR_WHITE, Placements_t[ i * 3 + 1 ], Placements_t[ i * 3 + 2 ] );
+			HudSetVisibility( Entities.FindByName( null, "bethud_" + GetNetworkID( hCaller ) ), false );
+		}
+		else
+		{
+			GetProfileModify( strFileName, -1, 1 );
+			ClientPrint( hCaller, 3, "You have enabled bet hud." );
 			
+			HudSetVisibility( Entities.FindByName( null, "bethud_" + GetNetworkID( hCaller ) ), true );
+		}
+		
 		return;
 	}
 	
@@ -606,8 +631,8 @@ function EndBet( nFactionWon )
 			local strName = NetworkIDToName( strID );
 			
 			ClientPrint( null, 3, "%s2%s3%s1 has won %s2%s4%s1 points! %s2" + nPoints.tostring() + "%s1 → %s2" + nNewPoints.tostring() + "%s1.", COLOR_LIGHTGREEN, COLOR_WHITE, strName ? strName : "id " + strID, nNewPoints - nPoints );
-			
-			StringToFile( "bet_profile_" + strID, PROFILE_VERSION + "|" + nNewPoints.tostring() );
+
+			GetProfileModify( "bet_profile_" + strID, nNewPoints );
 		}
 		
 		foreach( strID, nBetAmount in Bet_t[1] )
@@ -621,8 +646,8 @@ function EndBet( nFactionWon )
 			local strName = NetworkIDToName( strID );
 			
 			ClientPrint( null, 3, "%s2%s3%s1 has lost %s2%s4%s1 points! %s2" + nPoints.tostring() + "%s1 → %s2" + nNewPoints.tostring() + "%s1.", COLOR_LIGHTRED, COLOR_WHITE, strName ? strName : "id " + strID, nNewPoints - nPoints );
-			
-			StringToFile( "bet_profile_" + strID, PROFILE_VERSION + "|" + nNewPoints.tostring() );
+
+			GetProfileModify( "bet_profile_" + strID, nNewPoints );
 		}
 	}
 	else
@@ -638,8 +663,8 @@ function EndBet( nFactionWon )
 			local strName = NetworkIDToName( strID );
 			
 			ClientPrint( null, 3, "%s2%s3%s1 has won %s2%s4%s1 points! %s2" + nPoints.tostring() + "%s1 → %s2" + nNewPoints.tostring() + "%s1.", COLOR_LIGHTGREEN, COLOR_WHITE, strName ? strName : "id " + strID, nNewPoints - nPoints );
-			
-			StringToFile( "bet_profile_" + strID, PROFILE_VERSION + "|" + nNewPoints.tostring() );
+
+			GetProfileModify( "bet_profile_" + strID, nNewPoints );
 		}
 		
 		foreach( strID, nBetAmount in Bet_t[0] )
@@ -653,8 +678,8 @@ function EndBet( nFactionWon )
 			local strName = NetworkIDToName( strID );
 			
 			ClientPrint( null, 3, "%s2%s3%s1 has lost %s2%s4%s1 points! %s2" + nPoints.tostring() + "%s1 → %s2" + nNewPoints.tostring() + "%s1.", COLOR_LIGHTRED, COLOR_WHITE, strName ? strName : "id " + strID, nNewPoints - nPoints );
-			
-			StringToFile( "bet_profile_" + strID, PROFILE_VERSION + "|" + nNewPoints.tostring() );
+
+			GetProfileModify( "bet_profile_" + strID, nNewPoints );
 		}
 	}
 }
@@ -784,19 +809,18 @@ function OnGameEvent_asw_mission_restart( params )
 	fMissionStartTime <- 0.0;
 }
 
-// remove '|' symbols from player's name
 function FilterName( strName )
 {
-    local Split_t = split( strName, "|" );
-	if ( Split_t.len() < 2 )
-		return strName;
+    local strFilteredName = "";
+    for ( local i = 0; i < strName.len(); i++ )
+    {
+        if ( strName[i] == '|' )
+		strFilteredName += 'l'.tochar();
+	else
+		strFilteredName += strName[i].tochar();
+    }
 	
-    local strFiltered = "";
-
-    for ( local i = 0; i < Split_t.len(); ++i )
-        strFiltered += Split_t[i];
-
-    return strFiltered == "" ? "weird_name_person" : strFiltered;
+    return strip( strFilteredName ).len() == 0 ? "unnamed" : strFilteredName;
 }
 
 function NetworkIDToName( strID )
@@ -812,6 +836,45 @@ function NetworkIDToName( strID )
 function GetNetworkID( hPlayer )
 {
 	return hPlayer.GetNetworkIDString().slice(10);
+}
+
+// code inside function needs to be changed for profile version compatibility in the future when adding more information into profiles
+function GetProfileModify( strFileName, nPoints = -1, nHudEnabled = -1 )
+{
+	local bModified = false;
+	local Profile_t = FileToProfile( strFileName );
+	if ( Profile_t.len() == 0 )
+	{
+		Profile_t = StringToProfile( PROFILE_VERSION + "|0|1" );
+		
+		bModified = true;
+	}
+	else if ( Profile_t[0].tointeger() != PROFILE_VERSION )
+	{	
+		if ( Profile_t[0].tointeger() == 1 )
+			Profile_t = StringToProfile( "2|" + Profile_t[1] + "|1" );
+		
+		// future code here
+		
+		bModified = true;
+	}
+	
+	if ( nPoints >= 0 && Profile_t[1].tointeger() != nPoints )
+	{
+		Profile_t = StringToProfile( PROFILE_VERSION + "|" + nPoints.tostring() + "|" + Profile_t[2] );
+		bModified = true;
+	}
+		
+	if ( nHudEnabled >= 0 && Profile_t[2].tointeger() != nHudEnabled )
+	{
+		Profile_t = StringToProfile( PROFILE_VERSION + "|" + Profile_t[1] + "|" + nHudEnabled.tostring() );
+		bModified = true;
+	}
+	
+	if ( bModified )
+		StringToFile( strFileName, PROFILE_VERSION + "|" + Profile_t[1] + "|" + Profile_t[2] );
+		
+	return Profile_t;
 }
 
 function FileToProfile( strFileName )
